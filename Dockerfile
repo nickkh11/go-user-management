@@ -1,28 +1,23 @@
-# Указываем базовый образ
-FROM golang:1.20-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
-# Устанавливаем рабочую директорию внутри контейнера
+# Устанавливаем git, так как go mod может понадобиться прямое скачивание репозиториев
+RUN apk update && apk add --no-cache git
+
 WORKDIR /app
 
-# Копируем go.mod и go.sum для кеширования зависимостей
+# Копируем go.mod и go.sum
 COPY go.mod go.sum ./
+ENV GOPROXY=direct
 RUN go mod download
 
-# Копируем остальной код
 COPY . .
-
-# Собираем бинарник
 RUN go build -o /go/bin/user-service ./cmd/user-service
 
-# Минимизируем образ – используем базовый образ alpine
+# Минимизируем образ
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 
-# Копируем бинарник из предыдущего шага
 COPY --from=builder /go/bin/user-service /usr/local/bin/user-service
 
-# Говорим, на каком порту будет работать наше приложение
 EXPOSE 8080
-
-# Запускаем бинарник
 ENTRYPOINT ["/usr/local/bin/user-service"]
